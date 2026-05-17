@@ -2,7 +2,6 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-from urllib.parse import quote_plus
 
 import streamlit as st
 import pandas as pd
@@ -10,7 +9,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from sqlalchemy import create_engine
 from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
@@ -162,93 +160,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================================================
-# DATABASE CONNECTION
+# DATA LOADING FROM CSV
 # =========================================================
 
-@st.cache_resource
-def get_engine():
-    """Create database engine with connection pooling"""
-    try:
-        DB_USER = os.getenv("DB_USER")
-        DB_PASSWORD = os.getenv("DB_PASSWORD")
-        DB_HOST = os.getenv("DB_HOST")
-        DB_NAME = os.getenv("DB_NAME")
-        
-        # Validate environment variables
-        if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
-            st.error("⚠️ Missing database credentials in .env file")
-            return None
-
-        encoded_password = quote_plus(DB_PASSWORD)
-
-        return create_engine(
-            f"mysql+pymysql://{DB_USER}:{encoded_password}@{DB_HOST}/{DB_NAME}",
-            pool_size=10,
-            max_overflow=20,
-            pool_pre_ping=True,
-            pool_recycle=3600
-        )
-    except Exception as e:
-        st.error(f"Database connection failed: {e}")
-        return None
-
-engine = get_engine()
-
-if engine is None:
-    st.error("⚠️ Unable to connect to database. Please check your connection settings.")
-    st.stop()
-
-# =========================================================
-# DATA LOADING
-# =========================================================
-
-@st.cache_data(ttl=300)
+@st.cache_data
 def load_full_dataset():
-    """Load complete dataset"""
-    query = """
-    SELECT 
-        age, job, marital, education, balance, housing, loan,
-        contact, day, month, duration, campaign, pdays, previous,
-        poutcome, y, age_group, balance_category
-    FROM bank_campaign_data
-    """
-    try:
-        df = pd.read_sql(query, con=engine)
-        if df.empty:
-            st.error("No data retrieved from database")
-            return pd.DataFrame()
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return pd.DataFrame()
+    return pd.read_csv("bank_analytics_clean.csv")
 
-@st.cache_data(ttl=300)
-def load_metrics():
-    """Load aggregated metrics"""
-    query = """
-    SELECT 
-        COUNT(*) as total_records,
-        AVG(balance) as avg_balance,
-        STDDEV(balance) as std_balance,
-        AVG(age) as avg_age,
-        AVG(duration) as avg_duration,
-        SUM(CASE WHEN y = 'yes' THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as overall_conversion
-    FROM bank_campaign_data
-    """
-    try:
-        return pd.read_sql(query, con=engine)
-    except Exception as e:
-        st.error(f"Error loading metrics: {e}")
-        return pd.DataFrame()
+df = load_full_dataset()
 
-# Load data
-with st.spinner("🔄 Loading enterprise data..."):
-    df = load_full_dataset()
-    metrics = load_metrics()
-
-if df.empty:
-    st.error("No data available. Please check your database.")
-    st.stop()
+metrics = pd.DataFrame({
+    "total_records": [len(df)],
+    "avg_balance": [df["balance"].mean()],
+    "avg_age": [df["age"].mean()]
+})
 
 # =========================================================
 # SIDEBAR - DEFINE ALL VARIABLES HERE FIRST
@@ -357,10 +282,10 @@ with st.sidebar:
     # Apply filters button
     col1, col2 = st.columns([2, 1])
     with col1:
-        if st.button("🔄 Apply Filters", type="primary", use_container_width=True):
+        if st.button("🔄 Apply Filters", type="primary", width='stretch'):
             st.success("✅ Filters applied successfully!")
     with col2:
-        if st.button("🔄 Reset", use_container_width=True):
+        if st.button("🔄 Reset", width='stretch'):
             st.rerun()
 
 # =========================================================
@@ -512,7 +437,7 @@ with col1:
         xaxis=dict(tickangle=-45)
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 with col2:
     st.markdown("### 📊 Top Performers")
@@ -571,7 +496,7 @@ fig_heatmap.update_layout(
     height=500
 )
 
-st.plotly_chart(fig_heatmap, use_container_width=True)
+st.plotly_chart(fig_heatmap, width='stretch')
 
 # =========================================================
 # MACHINE LEARNING PREDICTIONS
@@ -627,7 +552,7 @@ if len(filtered_df) >= 100:
                 height=400
             )
             
-            st.plotly_chart(fig_imp, use_container_width=True)
+            st.plotly_chart(fig_imp, width='stretch')
         
         with col2:
             # Model metrics
@@ -655,7 +580,7 @@ if len(filtered_df) >= 100:
                 height=300
             )
             
-            st.plotly_chart(fig_dist, use_container_width=True)
+            st.plotly_chart(fig_dist, width='stretch')
             
     except Exception as e:
         st.warning(f"⚠️ ML model training issue: {str(e)}")
@@ -694,7 +619,7 @@ with col1:
         height=400
     )
     
-    st.plotly_chart(fig_edu, use_container_width=True)
+    st.plotly_chart(fig_edu, width='stretch')
 
 with col2:
     st.markdown("### 📊 Balance Distribution by Marital Status")
@@ -712,7 +637,7 @@ with col2:
         height=400
     )
     
-    st.plotly_chart(fig_box, use_container_width=True)
+    st.plotly_chart(fig_box, width='stretch')
 
 # =========================================================
 # CORRELATION ANALYSIS
@@ -740,7 +665,7 @@ fig_corr.update_layout(
     height=500
 )
 
-st.plotly_chart(fig_corr, use_container_width=True)
+st.plotly_chart(fig_corr, width='stretch')
 
 # =========================================================
 # CAMPAIGN ANALYSIS
@@ -774,7 +699,7 @@ with col1:
         yaxis2=dict(title="Conversion Rate (%)", overlaying='y', side='right')
     )
     
-    st.plotly_chart(fig_contact, use_container_width=True)
+    st.plotly_chart(fig_contact, width='stretch')
 
 with col2:
     # Previous outcome analysis
@@ -800,7 +725,7 @@ with col2:
         height=400
     )
     
-    st.plotly_chart(fig_pout, use_container_width=True)
+    st.plotly_chart(fig_pout, width='stretch')
 
 # =========================================================
 # DATA EXPORT SECTION
@@ -815,7 +740,7 @@ with col1:
     st.markdown("### 📊 Summary Statistics")
     st.dataframe(
         filtered_df[numeric_cols].describe(),
-        use_container_width=True
+        width='stretch'
     )
 
 with col2:
@@ -828,12 +753,12 @@ with col2:
         data=csv,
         file_name=f"banking_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv",
-        use_container_width=True
+        width='stretch'
     )
     
     # Sample data preview
     st.markdown("### 👀 Data Preview")
-    st.dataframe(filtered_df.head(10), use_container_width=True)
+    st.dataframe(filtered_df.head(10), width='stretch')
 
 with col3:
     # Quick insights

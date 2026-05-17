@@ -5,3 +5,5 @@ sqlalchemy
 pymysql
 numpy
 python-dotenv
+scikit-learn
+scipy
